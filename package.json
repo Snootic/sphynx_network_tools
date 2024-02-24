@@ -2,4 +2,8 @@
   "dependencies": {
     "local-devices": "^4.0.0"
   }
+},
+  "scripts": {
+    "test": "node deviceFinder.js"
+  }
 }
