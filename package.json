@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "local-devices": "^4.0.0"
+  }
+}
