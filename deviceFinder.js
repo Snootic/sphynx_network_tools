@@ -1,10 +1,15 @@
 const find = require('local-devices');
 
-const macPrefix = '08:AA:3E:8B:7C'; // Sphynx default MAC Address Prefix
+const macPrefix = '10:aa:bb:cc:33'; // Sphynx default MAC Address Prefix
 
 const findSphynx = (devices, macPrefix) => {
   return devices.filter(device => {
-    return device.mac === macPrefix;
+    let listaConjunto = (device.mac.split(":"));
+
+    listaConjunto.splice(5, 1)
+    let final = listaConjunto.join(":");
+
+    return final === macPrefix;
   });
 };
 
