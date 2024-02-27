@@ -1,8 +1,14 @@
 {
   "dependencies": {
-    "local-devices": "^4.0.0"
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "local-devices": "^4.0.0",
+    "node-network-scan": "^1.0.9",
+    "websocket": "^1.0.34",
+    "ws": "^8.16.0"
   },
   "scripts": {
     "test": "node deviceFinder.js"
-  }
+  },
+  "type": "module"
 }
