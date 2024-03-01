@@ -27,6 +27,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+    - run: cd sphynx_finder
     - run: npm test
     
   test_linux:
@@ -46,6 +47,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+    - run: cd sphynx_finder
     - run: npm test
 
     
