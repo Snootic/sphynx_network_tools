@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include "ESPAsyncWebServer.h"
 
 // code to create AP mode for ESP32, host a web server and scan local wifi in the area.
 // User must connect to the AP, go to the web page on 192.168.4.1 or sphynx-dev.local.
@@ -10,7 +11,9 @@
 const char* ssidAP = "Sphynx-WIFI";
 const char* senhaAP = "12345678";
 
-const char* html = R"HTML(
+AsyncWebServer server(80);
+
+String html = R"HTML(
   <!DOCTYPE html>
   <html lang="pt-br">
   <head>
@@ -20,7 +23,6 @@ const char* html = R"HTML(
 
   </head>
   <style>
-
       *{
           padding: 0;
           margin: 0;
@@ -61,6 +63,7 @@ const char* html = R"HTML(
           height: 90%;
           background-color: var(--color-background-bright);
           border-radius: 15px;
+          scrollbar-gutter: stable;
           overflow-y: scroll;
       }
 
@@ -85,20 +88,99 @@ const char* html = R"HTML(
 
       table.content-table th, table.content-table td a{
           color: white;
+          cursor: pointer;
           transition: .5s;
       }
 
       .correct:hover{
-          color: green;
-      }
-
-      .incorrect:hover{
-          color: red;
+          color:aquamarine;
       }
 
       table.content-table tbody tr{
           border-bottom: 1px solid var(--color-background);
           text-align: center;
+      }
+
+      .container::-webkit-scrollbar{
+          width: 10px;
+      }
+
+      .container::-webkit-scrollbar-track {
+          border-radius: 10px;
+          background-color: gray;
+      }
+      
+      .container::-webkit-scrollbar-thumb {
+          background: #fff; 
+          border-radius: 10px;
+      }
+
+      .conn-container{
+          position: absolute;
+          display: none;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          width: 90%;
+          height: 90%;
+          background-color: #022534af;
+          border-radius: 15px;
+          backdrop-filter: blur(10px);
+          z-index: 99;
+      }
+
+      .conn-container form{
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          height: 100%;
+          align-items: center;
+          justify-content: center;
+      }
+
+      .conn-container form label{
+          color: white;
+          font-size: 20px;
+      }
+
+      .password{
+          border: 0;
+          border-radius: 10px;
+          width: 40%;
+          height: 30px;
+          font-size: 20px;
+          padding: 10px;
+      }
+
+      .password:focus-visible{
+          outline: none;
+      }
+
+      .submit{
+          position: relative;
+          margin-top: 20px;
+          width: 20%;
+          height: 30px;
+          border-radius: 10px;
+          border: 0;
+          cursor: pointer;
+      }
+
+      .conn-exit{
+          position: relative;
+          margin-bottom: 30px;
+          width: 20%;
+          height: 30px;
+          border: 0;
+          border-radius: 15px;
+          cursor: pointer;
+          transition: .5s;
+      }
+
+      .conn-exit:hover{
+          background-color: #022534;
+          color: white;
       }
   </style>
   <body>
@@ -111,83 +193,88 @@ const char* html = R"HTML(
                           <th> Nome </th>
                           <th> Força do Sinal </th>
                           <th> Conectar </th>
-                          <th> Desconectar </th>
                       </tr>
                   </thead>
                   <tbody>)HTML";
 
-const char* htmlFooter = R"footer(                </tbody>
-            </table>
-        </div>
-    </main>
-    <footer></footer>
-    </body>
-    </html>)footer";
+String htmlFooter = R"footer(</tbody>
+  </table>
+      </div>
+      <div class="conn-container">
+          <form action="#" method="POST">
+              <label class="label" for="password">Digite a senha:</label>
+              <input class="password" type="password" name="password">
+              <input class="submit" type="submit" value="Send">
+          </form>
+          <button class="conn-exit"> Sair </button>
+      </div>
+  </main>
+  <footer></footer>
+  </body>
+  <script>
+    const buttons = document.querySelectorAll(".correct");
+    const widget = document.querySelector(".conn-container");
+    const label = document.querySelector(".label");
+    const buttonExit = document.querySelector(".conn-exit")
 
-WiFiServer serverAP(80);
-WiFiClient clientAtual;
-bool apServerUp = false;
+    buttons.forEach(element => {
+        element.addEventListener("click", () => {
+            const ssid = element.parentNode.parentNode.querySelectorAll("td")[0].textContent;
+            
+            widget.style.display = "flex";
+            label.textContent = "Digite a senha da rede " + ssid + ":"
+        })
+    });
 
-void setupWiFi(WiFiClient client) {
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-type:text/html");
-  client.println();
-  client.println(html);
+    buttonExit.addEventListener("click", () => {
+        widget.style.display = "none";
+    })
+  </script>
+  </html>)footer";
+
+
+
+
+void setupWiFi() {
+  // WiFi config Web Server
   int numRedes = WiFi.scanNetworks();
+  String linhas = "";
   for (int i = 0; i < numRedes; ++i) {
-    client.println("                    <tr>");
-    client.print("                        <td>");
-    client.print(WiFi.SSID(i));
-    client.println("</td>");
-    client.print("                        <td>");
-    client.print(WiFi.RSSI(i));
-    client.println(" dBm</td>");
-    client.println("                      <td>");
-    client.println("<a class=\"correct\" href=\"\"> <i class=\"fa-solid fa-square-check\"></i> </a>");
-    client.println("</td>");
-    client.println("                      <td>");
-    client.println("<a class=\"incorrect\" href=\"\"><i class=\"fa-solid fa-circle-xmark\"></i></a>");
-    client.println("</td>");
-    client.println("                   </tr>");
+    linhas += ("<tr><td>" + WiFi.SSID(i) + "</td><td>" + WiFi.RSSI(i) + "dBm</td><td> <a class='correct'> Connect </a> </tr>");
   }
-  client.println(htmlFooter);
+  Serial.print("Encontrado ");
+  Serial.print(numRedes);
+  Serial.println(" redes WiFi na area");
+  html+= linhas + htmlFooter;
+}
+
+void apServer(){
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    setupWiFi();
+    request->send_P(200, "text/html", html.c_str());
+  });
 }
 
 void setup() {
   Serial.begin(115200);
 
-  Serial.print("Configurando Acess Point...");
+  Serial.println("Configurando Acess Point...");
   WiFi.softAP(ssidAP, senhaAP);
 
   IPAddress IP = WiFi.softAPIP();
   Serial.print("Endereco IP do AP: ");
   Serial.println(IP);
 
-  serverAP.begin();
-  apServerUp = true;
-
   if (!MDNS.begin("Sphynx-dev")) {
   Serial.println("Erro ao iniciar mDNS");
   return;
   }
+
+  server.begin();
+
+  apServer();
 }
 
 void loop() {
-  if (apServerUp){
-    Serial.println("Server is up!");
-    WiFiClient client = serverAP.available();
-    if (client) {
-      Serial.println("Novo Client.");
-      clientAtual = client;
-      while (client.connected()) {
-        if (client.available()) {
-            setupWiFi(clientAtual);
-            break;
-            }
-      }
-      client.stop();
-      Serial.println("Client Desconectado..");
-    }
-    delay(500);
-  }
+  delay(500);
 }
