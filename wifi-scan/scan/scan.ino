@@ -191,7 +191,7 @@ String html = R"HTML(
                   <thead>
                       <tr>
                           <th> Nome </th>
-                          <th> Força do Sinal </th>
+                          <th> Força do sinal </th>
                           <th> Conectar </th>
                       </tr>
                   </thead>
@@ -232,26 +232,29 @@ String htmlFooter = R"footer(</tbody>
   </script>
   </html>)footer";
 
-
-
+String indexHtml;
 
 void setupWiFi() {
   // WiFi config Web Server
-  int numRedes = WiFi.scanNetworks();
-  String linhas = "";
-  for (int i = 0; i < numRedes; ++i) {
-    linhas += ("<tr><td>" + WiFi.SSID(i) + "</td><td>" + WiFi.RSSI(i) + "dBm</td><td> <a class='correct'> Connect </a> </tr>");
-  }
-  Serial.print("Encontrado ");
-  Serial.print(numRedes);
-  Serial.println(" redes WiFi na area");
-  html+= linhas + htmlFooter;
-}
-
-void apServer(){
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    setupWiFi();
-    request->send_P(200, "text/html", html.c_str());
+   String linhas = ""; 
+   if(WiFi.scanComplete() == -2){
+    WiFi.scanNetworks(true);
+    linhas += ("<tr><td>Procurando</td><td>Procurando</td><td> <a class='correct'>Procurando</a> </tr>");
+   }else if (WiFi.scanComplete() == -1){
+    linhas += ("<tr><td>Procurando</td><td>Procurando</td><td> <a class='correct'>Procurando</a> </tr>");
+   }else{
+    Serial.print("Encontrado ");
+    Serial.print(WiFi.scanComplete());
+    Serial.println(" redes WiFi na area");
+    for (int i = 0; i < WiFi.scanComplete(); ++i) {
+      linhas += ("<tr><td>" + WiFi.SSID(i) + "</td><td>" + WiFi.RSSI(i) + "dBm</td><td> <a class='correct'> Connect </a> </tr>");
+    }
+    WiFi.scanDelete();
+  }
+  indexHtml = html + linhas + htmlFooter;
+  linhas = "";
+  request->send_P(200, "text/html", indexHtml.c_str());
   });
 }
 
@@ -272,7 +275,7 @@ void setup() {
 
   server.begin();
 
-  apServer();
+  setupWiFi();
 }
 
 void loop() {
