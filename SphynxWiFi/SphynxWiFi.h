@@ -12,6 +12,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include "ESPAsyncWebServer.h"
+#include <Preferences.h>
 
 class SphynxWiFiClass
 {
@@ -22,8 +23,9 @@ class SphynxWiFiClass
 
         void setupWiFi();
         void scan();
-        void connect();
+        int connect();
         int status();
+        void saveCredentials();
     private:
         //   const char* hostname = "sphynx-dev";
 };

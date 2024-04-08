@@ -1,18 +1,4 @@
-/*
-  SphynxWiFi library: https://github.com/Snootic/sphynx_network_tools/tree/main/wifi-scan
-  For Sphynx: https://github.com/PedroVidalDev/esp32-sphynx
-  code to create AP mode for ESP32, host a web server and scan local wifi in the area.
-  Connect to the web page on 192.168.4.1 or sphynx-dev.local and connect to a WiFi.
-  By: Snootic & PedroVidalDev - 2024
-*/
-#include "SphynxWiFi.h"
-#include "Arduino.h"
-
-AsyncWebServer apServer(80);
-Preferences WiFiPreferences;
-
-String html = R"HTML(
-    <!DOCTYPE html>
+<!DOCTYPE html>
     <html lang="pt-br">
     <head>
         <meta charset="UTF-8">
@@ -223,24 +209,24 @@ String html = R"HTML(
                             <th> Força do sinal </th>
                             <th> Conectar </th>
                         </tr>
+                        <tr><td> teste </td><td> teste dBm</td><td> <a class='correct'> Connect </a> </tr>
                     </thead>
-                    <tbody>)HTML";
-
-String htmlFooter = R"footer(</tbody>
-    </table>
-        </div>
-        <button class="atualizar"> Atualizar </button>
-        <div class="conn-container">
-            <form action="/post" method="POST">
-                <input type="hidden" name="ssid" id="ssid">
-                <label class="label" for="password">Digite a senha:</label>
-                <input class="password" type="password" name="password">
-                <input class="submit" type="submit" value="Enviar">
-            </form>
-            <button class="conn-exit"> Sair </button>
-        </div>
-    </main>
-    <footer></footer>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+            <button class="atualizar"> Atualizar </button>
+            <div class="conn-container">
+                <form action="/post" method="POST">
+                    <input type="hidden" name="ssid" id="ssid">
+                    <label class="label" for="password">Digite a senha:</label>
+                    <input class="password" type="password" name="password">
+                    <input class="submit" type="submit" value="Enviar">
+                </form>
+                <button class="conn-exit"> Sair </button>
+            </div>
+        </main>
+        <footer></footer>
     </body>
     <script>
         const buttons = document.querySelectorAll(".correct");
@@ -269,116 +255,4 @@ String htmlFooter = R"footer(</tbody>
         location.reload();
         })
     </script>
-    </html>)footer";
-
-String indexHtml;
-String ssid;
-String senha;
-
-SphynxWiFiClass::SphynxWiFiClass(){}
-
-int SphynxWiFiClass::connect() {
-    WiFiPreferences.begin("WiFiCred", false);
-
-    ssid = WiFiPreferences.getString("ssid", "");
-    senha = WiFiPreferences.getString("senha", "");
-
-    WiFiPreferences.end();
-
-    if (ssid == "" || senha == ""){
-        return 1;
-    }
-    WiFi.begin(ssid, senha);
-    // Tries to connect to the specified wifi
-    int tentativas = 0;
-    while (tentativas <= 15 && WiFi.status() != WL_CONNECTED){
-        delay(1000);
-        Serial.println("Esperando conexão wifi...");
-        tentativas++;
-    }
-    if (tentativas > 15){
-        Serial.println("Não foi possível se conectar ao WiFI");
-        WiFi.disconnect();
-        return 1;
-    }else{
-        Serial.println(WiFi.localIP());
-        return 0;
-    }
-}
-
-void SphynxWiFiClass::saveCredentials(){
-    apServer.on("/post", HTTP_POST,[](AsyncWebServerRequest * request){
-        if(request->hasParam("ssid", true) && request->hasParam("password", true)){
-            Serial.println("RECEBEU OS PARAMETROS");
-            ssid = request->getParam("ssid", true)->value();
-            Serial.println("OK");
-            senha = request->getParam("password", true)->value();
-            Serial.println("OK");
-
-        }else{
-            Serial.println("Não foi possível pegar SSID e SENHA");
-            return;
-        }
-
-        apServer.end();
-
-        WiFiPreferences.begin("WiFiCred", false);
-        WiFiPreferences.clear();
-        WiFiPreferences.putString("ssid", ssid);
-        WiFiPreferences.putString("senha", senha);
-        Serial.println(WiFiPreferences.getString("ssid", ""));
-        Serial.println(WiFiPreferences.getString("ssid", ""));
-
-        WiFiPreferences.end();
-        SphynxWiFi.connect();
-    });
-}
-
-void SphynxWiFiClass::scan() {
-  // WiFi config Web Server
-  apServer.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-   String linhas = ""; 
-   if(WiFi.scanComplete() == -2){
-    WiFi.scanNetworks(true);
-    linhas += ("<tr><td>Procurando</td><td>Procurando</td><td> <a class='correct'>Procurando</a> </tr>");
-   }else if (WiFi.scanComplete() == -1){
-    linhas += ("<tr><td>Procurando</td><td>Procurando</td><td> <a class='correct'>Procurando</a> </tr>");
-   }else{
-    Serial.print("Encontrado ");
-    Serial.print(WiFi.scanComplete());
-    Serial.println(" redes WiFi na area");
-    for (int i = 0; i < WiFi.scanComplete(); ++i) {
-      linhas += ("<tr><td>" + WiFi.SSID(i) + "</td><td>" + WiFi.RSSI(i) + "dBm</td><td> <a class='correct'> Connect </a> </tr>");
-    }
-    WiFi.scanDelete();
-  }
-  indexHtml = html + linhas + htmlFooter;
-  linhas = "";
-  request->send_P(200, "text/html", indexHtml.c_str());
-  });
-}
-
-void SphynxWiFiClass::setupWiFi() {
-    if (connect() != 0) {
-        Serial.println("Configurando Access Point...");
-        WiFi.softAP(ssidAP, senhaAP);
-
-        IPAddress IP = WiFi.softAPIP();
-        Serial.print("Endereco IP do AP: ");
-        Serial.println(IP);
-
-        if (!MDNS.begin("Sphynx-dev")) {
-            Serial.println("Erro ao iniciar mDNS");
-            return;
-        }
-        apServer.begin();
-        scan(); //Starts AP Mode server. Connects to 192.168.4.1 or sphynx-dev.local
-        saveCredentials();
-    }
-}
-
-int SphynxWiFiClass::status() {
-    return WiFi.status();
-}
-
-SphynxWiFiClass SphynxWiFi;
+</html>
