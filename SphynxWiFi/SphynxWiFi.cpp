@@ -278,7 +278,7 @@ String senha;
 SphynxWiFiClass::SphynxWiFiClass(){}
 
 int SphynxWiFiClass::connect() {
-    WiFiPreferences.begin("WiFiCred", false);
+    WiFiPreferences.begin("WiFiCred", true);
 
     ssid = WiFiPreferences.getString("ssid", "");
     senha = WiFiPreferences.getString("senha", "");
@@ -301,7 +301,21 @@ int SphynxWiFiClass::connect() {
         WiFi.disconnect();
         return 1;
     }else{
+        try {
+            if (WiFi.softAPdisconnect(true) != 0) {
+                throw "Nenhum AP encontrado";
+            }
+            apServer.end();
+        } catch (const char* error) {
+            Serial.println(error);
+        }
+        Serial.print("Endereço IP:");
         Serial.println(WiFi.localIP());
+        Serial.print("Endereço MAC:");
+        Serial.println(WiFi.macAddress());
+        WiFi.setHostname("Sphynx");
+        Serial.print("Hostname:");
+        Serial.println(WiFi.getHostname());
         return 0;
     }
 }
@@ -320,14 +334,10 @@ void SphynxWiFiClass::saveCredentials(){
             return;
         }
 
-        apServer.end();
-
         WiFiPreferences.begin("WiFiCred", false);
         WiFiPreferences.clear();
         WiFiPreferences.putString("ssid", ssid);
         WiFiPreferences.putString("senha", senha);
-        Serial.println(WiFiPreferences.getString("ssid", ""));
-        Serial.println(WiFiPreferences.getString("ssid", ""));
 
         WiFiPreferences.end();
         SphynxWiFi.connect();
@@ -359,22 +369,20 @@ void SphynxWiFiClass::scan() {
 }
 
 void SphynxWiFiClass::setupWiFi() {
-    if (connect() != 0) {
-        Serial.println("Configurando Access Point...");
-        WiFi.softAP(ssidAP, senhaAP);
+    Serial.println("Configurando Access Point...");
+    WiFi.softAP(ssidAP, senhaAP);
 
-        IPAddress IP = WiFi.softAPIP();
-        Serial.print("Endereco IP do AP: ");
-        Serial.println(IP);
+    IPAddress IP = WiFi.softAPIP();
+    Serial.print("Endereco IP do AP: ");
+    Serial.println(IP);
 
-        if (!MDNS.begin("Sphynx-dev")) {
-            Serial.println("Erro ao iniciar mDNS");
-            return;
-        }
-        apServer.begin();
-        scan(); //Starts AP Mode server. Connects to 192.168.4.1 or sphynx-dev.local
-        saveCredentials();
+    if (!MDNS.begin("Sphynx-dev")) {
+        Serial.println("Erro ao iniciar mDNS");
+        return;
     }
+    apServer.begin();
+    scan(); //Starts AP Mode server. Connects to 192.168.4.1 or sphynx-dev.local
+    saveCredentials();
 }
 
 int SphynxWiFiClass::status() {
